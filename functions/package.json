@@ -1,0 +1,19 @@
+{
+  "name": "autismo-rancagua-tesoreria-v58",
+  "version": "1.0.58",
+  "private": true,
+  "description": "Tesorería V58: contabilidad explícita y procesos Firebase en horario de Chile",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node scripts/test.js",
+    "check": "node --check index.js && node --check src/domain.js && node --check src/service.js",
+    "test:integration": "node test/integration/firestore.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^6.6.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "autismo-rancagua-v58-security-tests",
+  "version": "58.0.0",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "check:fixtures": "node scripts/build-rule-fixtures.js --check",
+    "test": "node test/rules.test.js",
+    "test:demo": "node test/demo.rules.test.js",
+    "test:emulators": "firebase emulators:exec --project demo-autismo-rancagua-v58 --config ../firebase.v58.emulators.json --only firestore,storage 'npm test && npm run test:demo'"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.0.0",
+    "firebase-tools": "^15.0.0"
+  }
+}

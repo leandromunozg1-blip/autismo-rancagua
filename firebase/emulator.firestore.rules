@@ -1,0 +1,159 @@
+// SOLO pruebas locales demo-autismo-rancagua-v58. NUNCA desplegar este archivo.
+// Los módulos ajenos a Tesorería se deniegan deliberadamente en este fixture.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+// V58: insertar DENTRO de match /databases/{database}/documents.
+// Fragmento de integración, NO sustituye las reglas V57 desplegadas.
+// Modelo: usuarios/{uid}.rol:string y/o roles:list son autoridad protegida;
+// activo:false revoca Tesorería. Solo administración de confianza puede cambiarlos.
+// Comprobantes/asientos son escritos exclusivamente por Admin SDK en Functions.
+// avisos_apoderados.apoderado_id es UID Auth (no el ID financiero/RUT).
+// La propiedad de ficha se expresa por UID, nunca por correo o RUT inferido.
+function v58Authenticated() {
+  return request.auth != null;
+}
+function v58Owner(uid) {
+  return v58Authenticated() && uid is string && uid == request.auth.uid;
+}
+function v58Staff() {
+  let p = get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+  let roles = ['tesoreria', 'tesorero', 'admin_general', 'admin',
+    'administrador', 'admin_asociacion', 'administrador_asociacion', 'asociacion'];
+  return v58Authenticated() && p.get('activo', true) != false &&
+    (p.get('rol', '') in roles || p.get('roles', []).hasAny(roles));
+}
+function v58CuentaOwner(d) {
+  return v58Authenticated() &&
+    (d.get('apoderado_uid', '') == request.auth.uid ||
+     d.get('uid_apoderado', '') == request.auth.uid ||
+     d.get('uid', '') == request.auth.uid ||
+     d.get('apoderados_uids_autorizados', []).hasAny([request.auth.uid]));
+}
+// Añadir esta condición a las escrituras de perfiles V57 que admitan edición
+// del propio usuario. NO añadir otro allow que conviva con un allow más amplio.
+// Validar también el esquema permitido del perfil y sus campos obligatorios.
+function v58PerfilAuthorityUnchanged() {
+  return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+    'rol', 'roles', 'activo', 'uid', 'auth_uid', 'apoderado_uid',
+    'uid_apoderado', 'apoderados_uids_autorizados', 'perfil_origen',
+    'perfil_origen_id', 'profesional_uid', 'profesional_id'
+  ]);
+}
+function v58AvisoReadUpdateValid() {
+  let d = request.resource.data;
+  let changed = d.diff(resource.data).affectedKeys();
+  return d.keys().hasAll(resource.data.keys()) &&
+    d.keys().hasAll(['apoderado_id']) &&
+    d.apoderado_id == resource.data.apoderado_id &&
+    changed.hasOnly(['leido', 'aceptado', 'fecha_lectura']) && changed.size() > 0 &&
+    (!('leido' in d) || d.leido is bool) &&
+    (!('aceptado' in d) || d.aceptado is bool) &&
+    (!('fecha_lectura' in d) || d.fecha_lectura is timestamp) &&
+    (!changed.hasAny(['leido']) || d.leido == true) &&
+    (!changed.hasAny(['aceptado']) || d.aceptado == true) &&
+    (!changed.hasAny(['fecha_lectura']) ||
+      (d.fecha_lectura <= request.time &&
+       d.fecha_lectura > request.time - duration.value(5, 'm')));
+}
+function v58FichaEditValid() {
+  let d = request.resource.data;
+  return d.keys().hasAll(resource.data.keys()) &&
+    d.diff(resource.data).affectedKeys().hasOnly([
+      'cuota_mensual', 'aviso_activo', 'mensaje_aviso', 'actualizado'
+    ]) &&
+    (!('cuota_mensual' in d) || (d.cuota_mensual is int &&
+      d.cuota_mensual >= 0 && d.cuota_mensual <= 100000000)) &&
+    (!('aviso_activo' in d) || d.aviso_activo is bool) &&
+    (!('mensaje_aviso' in d) || (d.mensaje_aviso is string && d.mensaje_aviso.size() <= 2000)) &&
+    (!('actualizado' in d) || d.actualizado == request.time);
+}
+function v58FichaAvisoReadValid() {
+  let d = request.resource.data;
+  return d.keys().hasAll(resource.data.keys()) &&
+    d.diff(resource.data).affectedKeys().hasOnly([
+      'aviso_visto_por_apoderado', 'fecha_lectura_aviso'
+    ]) && d.aviso_visto_por_apoderado is bool &&
+    d.aviso_visto_por_apoderado == true &&
+    d.fecha_lectura_aviso == request.time;
+}
+// Auditoría de ingresos institucionales V57: permite el registro manual actual,
+// pero no permite fabricar la auditoría de aprobación V58 del servidor.
+function v58AuditCreateValid() {
+  let d = request.resource.data;
+  let e = d.extra;
+  return d.keys().hasAll(['accion', 'detalle', 'extra', 'usuario_uid', 'usuario_email', 'fecha']) &&
+    d.keys().hasOnly(['accion', 'detalle', 'extra', 'usuario_uid', 'usuario_email', 'fecha']) &&
+    d.accion == 'registrar_ingreso_institucional' &&
+    d.detalle is string && d.detalle.size() > 0 && d.detalle.size() <= 2000 &&
+    d.usuario_uid is string && d.usuario_uid == request.auth.uid &&
+    d.usuario_email is string && d.usuario_email.size() <= 320 &&
+    d.usuario_email == request.auth.token.get('email', '') &&
+    d.fecha == request.time && e is map &&
+    e.keys().hasOnly(['concepto', 'monto', 'detalle', 'cuenta_destino']) &&
+    (!('concepto' in e) || (e.concepto is string && e.concepto.size() <= 120)) &&
+    (!('monto' in e) || (e.monto is int && e.monto > 0 && e.monto <= 100000000)) &&
+    (!('detalle' in e) || (e.detalle is string && e.detalle.size() <= 2000)) &&
+    (!('cuenta_destino' in e) || (e.cuenta_destino is string && e.cuenta_destino.size() <= 60));
+}
+match /comprobantes_pago/{id} {
+  allow read: if v58Staff() || v58Owner(resource.data.get('uid', ''));
+  allow create, update, delete: if false;
+}
+match /tesoreria_movimientos/{id} {
+  allow read: if v58Staff();
+  allow create, update, delete: if false;
+}
+match /tesoreria_pagos/{id} {
+  allow read: if v58Staff();
+  allow create, update, delete: if false;
+}
+match /tesoreria_notificaciones/{id} {
+  allow read: if v58Staff();
+  allow create, update, delete: if false;
+}
+// Reserva privada de la huella de imagen (hash comprobado por Storage/Admin SDK).
+// Ningún cliente puede obtener huellas ajenas ni liberar/reutilizar una reserva.
+match /tesoreria_comprobantes_huellas_v58/{id} {
+  allow read, create, update, delete: if false;
+}
+match /tesoreria_procesos_v58/{id} {
+  allow read: if v58Staff();
+  allow create, update, delete: if false;
+}
+// La habilitación automática se revisa y configura desde una operación Admin SDK
+// autorizada. No cambia permisos de montos_oficiales ni de otros documentos V57.
+match /configuracion_tesoreria/automatizacion_v58 {
+  allow read: if v58Staff();
+  allow create, update, delete: if false;
+}
+match /tesoreria_auditoria/{id} {
+  allow read: if v58Staff();
+  allow create: if v58Staff() && v58AuditCreateValid();
+  allow update, delete: if false;
+}
+match /tesoreria_apoderados/{id} {
+  allow read: if v58Staff() || v58CuentaOwner(resource.data);
+  allow update: if (v58Staff() && v58FichaEditValid()) ||
+    (v58CuentaOwner(resource.data) && v58FichaAvisoReadValid());
+  // Las altas, vínculos y operaciones de Coordinación V57 deben fusionarse
+  // con las reglas reales tras revisar su autorización y validación.
+  // No otorgar al padre permiso para editar UID/ACL/saldo ni borrar fichas.
+  allow create, delete: if false;
+}
+match /avisos_apoderados/{id} {
+  allow read: if v58Staff() || v58Owner(resource.data.get('apoderado_id', ''));
+  allow update: if v58Owner(resource.data.get('apoderado_id', '')) &&
+    v58AvisoReadUpdateValid();
+  // Integrar por separado los avisos de otros módulos V57, si escriben clientes.
+  allow create, delete: if false;
+}
+
+    // Perfil provisionado únicamente con Admin SDK; el cliente no asigna roles.
+    match /usuarios/{uid} {
+      allow read: if v58Owner(uid);
+      allow write: if false;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

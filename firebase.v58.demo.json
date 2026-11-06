@@ -1,0 +1,13 @@
+{
+  "firestore": {"rules": "firebase/demo.firestore.rules"},
+  "storage": {"rules": "firebase/emulator.storage.rules"},
+  "functions": [{"source": "functions", "codebase": "tesoreria-v58"}],
+  "emulators": {
+    "firestore": {"host": "127.0.0.1", "port": 8080},
+    "storage": {"host": "127.0.0.1", "port": 9199},
+    "auth": {"host": "127.0.0.1", "port": 9099},
+    "functions": {"host": "127.0.0.1", "port": 5001},
+    "ui": {"enabled": false},
+    "singleProjectMode": true
+  }
+}

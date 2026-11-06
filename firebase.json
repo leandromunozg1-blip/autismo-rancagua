@@ -1,0 +1,49 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "autismo-rancagua",
+          "appId": "1:242942782228:android:5becc9be752c5a6aeb7001",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "autismo-rancagua",
+          "configurations": {
+            "android": "1:242942782228:android:5becc9be752c5a6aeb7001",
+            "ios": "1:242942782228:ios:0a80f2fb4c0d88b2eb7001",
+            "macos": "1:242942782228:ios:0a80f2fb4c0d88b2eb7001",
+            "web": "1:242942782228:web:a9c64368dc1efe8deb7001",
+            "windows": "1:242942782228:web:b4b776a34ba2c122eb7001"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "tesoreria-v58",
+      "runtime": "nodejs22",
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run check"
+      ]
+    }
+  ]
+}

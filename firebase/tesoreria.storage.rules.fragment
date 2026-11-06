@@ -1,0 +1,24 @@
+// V58: insertar DENTRO de match /b/{bucket}/o. No reemplaza rutas V57.
+// Archivo privado immutable: comprobantes_v58/{Auth UID}/{solicitudId}.jpg|png|webp.
+// Solo Functions verifica su asociación a cuenta/cargo antes de crear comprobante.
+function v58StorageOwner(uid) {
+  return request.auth != null && request.auth.uid == uid;
+}
+function v58StorageStaff() {
+  let p = firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data;
+  let roles = ['tesoreria', 'tesorero', 'admin_general', 'admin',
+    'administrador', 'admin_asociacion', 'administrador_asociacion', 'asociacion'];
+  return request.auth != null && p.get('activo', true) != false &&
+    (p.get('rol', '') in roles || p.get('roles', []).hasAny(roles));
+}
+function v58ImageValid(name) {
+  return request.resource.size > 0 && request.resource.size <= 10 * 1024 * 1024 &&
+    ((name.matches('^[A-Za-z0-9_-]{16,128}[.]jpg$') && request.resource.contentType == 'image/jpeg') ||
+     (name.matches('^[A-Za-z0-9_-]{16,128}[.]png$') && request.resource.contentType == 'image/png') ||
+     (name.matches('^[A-Za-z0-9_-]{16,128}[.]webp$') && request.resource.contentType == 'image/webp'));
+}
+match /comprobantes_v58/{uid}/{fileName} {
+  allow read: if v58StorageOwner(uid) || v58StorageStaff();
+  allow create: if v58StorageOwner(uid) && v58ImageValid(fileName);
+  allow update, delete: if false;
+}
